@@ -19,8 +19,12 @@ void vector_add_cpu(float *a, float *b, float *c, int n) {
 // CUDA kernel for GPU vector addition
 __global__ void vector_add_gpu(float *a, float *b, float *c, int n) {
     /*
-        grid dim: ceil(N/BLOCK_SIZE) x 1 x 1
-        block dim: BLOCK_SIZE x 1 x 1
+        grid dim: 1 x 1 x ceil(N/BLOCK_SIZE)
+        block dim: 1 x 1 x BLOCK_SIZE
+        
+        x -> col
+        y -> row
+        z -> depth
         
         workflow:
         obtain the offset of each thread, which is the idx to access a and b
@@ -100,9 +104,12 @@ int main() {
 
     /*
         define grid dimension. In this code snippet, we want our grid and block both have 
-        1D dimensions. Note, instead of being 1 x BLOCK_SIZE, the actual block dim is implicitly
-        BLOCK_SIZE x 1 x 1. So as the grid dim. The number in between <<< >>> tells the nvcc
-        the grid and block dim.
+        1D dimensions. But actually, regardless of 1D, 2D or 3D, the final dim will always be 
+        3D, as a trivial axes will be added to the dim. 
+
+        One thing to note is the CUDA convention, where we shall set the dim reversely, i.e, we 
+        want 1 x BLOCK_SIZE, then, grid dim is ((N + BLOCK_SIZE - 1) / BLOCK_SIZE, 1, 1), we can
+        omit the last two 1s. Same logic applies to block size
     */
     /*
         initially, I wrote int grid_size = ceil(N / BLOCK_SIZE)

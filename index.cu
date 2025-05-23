@@ -39,60 +39,77 @@
  *
  */
 
-#include <stdio.h>
+ #include <stdio.h>
 
-/*
-    This function prints out the idx of current thread
-    We have 4 built-in variables:
-    girdDim: dimension of the grid
-    blockDim: dimension of the block
-    blockIdx: which block it is in the grid
-    ThreadIdx: which thread it is in the block
-*/
+ /*
+     This function prints out the idx of current thread
+     We have 4 built-in variables:
+     girdDim: dimension of the grid
+     blockDim: dimension of the block
+     blockIdx: which block it is in the grid
+     ThreadIdx: which thread it is in the block
 
-__global__ void whoami(void) {
-    int block_id =
-            blockIdx.x * gridDim.y * gridDim.z +  // building number
-            blockIdx.y * gridDim.z +    // floor number in this building (rows high)
-            blockIdx.z;   // room number
+     One really important thing to remember is:
+     for both block and grid:
+     .x -> col
+     .y -> row
+     .z -> depth
 
-    int block_offset =
-            block_id * // times our apartment number
-            blockDim.x * blockDim.y * blockDim.z; // total threads per block (people per apartment)
+     the following code shows a flattening of the threads
+     However, in many situations, we don't have to flatten the grid into a list, we can have 2D index or even 3D index, making 
+     it easier to compute global index of each thread. (Check vector_add.cu and matmul.cu)
 
-    int thread_offset =
-            threadIdx.x * blockDim.y * blockDim.z +
-            threadIdx.y * blockDim.z +
-            threadIdx.z;
-
-    int id = block_offset + thread_offset; // global person id in the entire apartment complex
-
-    printf("%04d | Block(%d %d %d) = %3d | Thread(%d %d %d) = %3d\n",
-           id,
-           blockIdx.x, blockIdx.y, blockIdx.z, block_id,
-           threadIdx.x, threadIdx.y, threadIdx.z, thread_offset);
-    // printf("blockIdx.x: %d, blockIdx.y: %d, blockIdx.z: %d, threadIdx.x: %d, threadIdx.y: %d, threadIdx.z: %d\n", blockIdx.x, blockIdx.y, blockIdx.z, threadIdx.x, threadIdx.y, threadIdx.z);
-}
-
-int main() {
-    const int b_x = 2, b_y = 3, b_z = 4; // 24 blocks inside a grid
-    const int t_x = 4, t_y = 4, t_z = 4; // 64 threads in a block
-
-    int block_per_grid = b_x * b_y * b_z;
-    int thread_per_block = t_x * t_y * t_z;
-
-    printf("blocks per grid: %d\n", block_per_grid);
-    printf("threads per block: %d\n", thread_per_block);
-    printf("total threads: %d\n", thread_per_block * block_per_grid);
-
-    // dim3 is a useful helper type for stating the grid and block dimension (grid dimnsion is block per grid, and block dimension is thread per grid)
-    dim3 blockPerGrid(b_x, b_y, b_z);
-    dim3 threadPerBlock(t_x, t_y, t_z);
-
-    // This is the format for calling thread function
-    whoami<<<blockPerGrid, threadPerBlock>>>();
-
-    // Wait until all threads are finished
-    cudaDeviceSynchronize();
-    printf("finished\n");
-}
+     To acquire deeper understanding of indexing, the only way is to practice!
+ */
+ 
+ __global__ void whoami(void) {
+     int block_id =
+             blockIdx.x +  
+             blockIdx.y * gridDim.x +    // floor number in this building (rows high)
+             blockIdx.z * gridDim.x * gridDim.y;   // room number
+ 
+     int block_offset =
+             block_id * // times our apartment number
+             blockDim.x * blockDim.y * blockDim.z; // total threads per block (people per apartment)
+ 
+     int thread_offset =
+             threadIdx.x +
+             threadIdx.y * blockDim.x +
+             threadIdx.z * blockDim.x * blockDim.y;
+ 
+     int id = block_offset + thread_offset; // global person id in the entire apartment complex
+ 
+     printf("%04d | Block(%d %d %d) = %3d | Thread(%d %d %d) = %3d\n",
+            id,
+            blockIdx.x, blockIdx.y, blockIdx.z, block_id,
+            threadIdx.x, threadIdx.y, threadIdx.z, thread_offset);
+     // printf("blockIdx.x: %d, blockIdx.y: %d, blockIdx.z: %d, threadIdx.x: %d, threadIdx.y: %d, threadIdx.z: %d\n", blockIdx.x, blockIdx.y, blockIdx.z, threadIdx.x, threadIdx.y, threadIdx.z);
+ }
+ 
+ int main() {
+     const int b_x = 2, b_y = 3, b_z = 4; // 24 blocks inside a grid
+     const int t_x = 4, t_y = 4, t_z = 4; // 64 threads in a block
+ 
+     int block_per_grid = b_x * b_y * b_z;
+     int thread_per_block = t_x * t_y * t_z;
+ 
+     printf("blocks per grid: %d\n", block_per_grid);
+     printf("threads per block: %d\n", thread_per_block);
+     printf("total threads: %d\n", thread_per_block * block_per_grid);
+ 
+     // dim3 is a useful helper type for stating the grid and block dimension (grid dimnsion is block per grid, and block dimension is thread per grid)
+     /*
+        CUDA convention will set x as col, y as row and z as depth
+        So, your actual dimension in the following is (b_z, b_y, b_x)
+        This is important when you are writing your instructions in your kernel
+     */
+     dim3 blockPerGrid(b_x, b_y, b_z);
+     dim3 threadPerBlock(t_x, t_y, t_z);
+ 
+     // This is the format for calling thread function
+     whoami<<<blockPerGrid, threadPerBlock>>>();
+ 
+     // Wait until all threads are finished
+     cudaDeviceSynchronize();
+     printf("finished\n");
+ }

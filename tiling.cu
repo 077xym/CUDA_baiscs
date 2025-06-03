@@ -83,9 +83,8 @@ __global__ void matmul_naive(float *a, float *b, float *c, int m, int k, int n) 
     assign value
     We have global row and col
 
-
-
 */
+
 __global__ void matmul_tile(float *a, float *b, float *c, int m, int k, int n) {
     __shared__ float sharedA[TILE_SIZE][TILE_SIZE];
     __shared__ float sharedB[TILE_SIZE][TILE_SIZE];
@@ -100,7 +99,7 @@ __global__ void matmul_tile(float *a, float *b, float *c, int m, int k, int n) {
 
     float sum = 0.0f;
 
-    for (int tile = 0; tile < (K + TILE_SIZE - 1) / TILE_SIZE; tile++) {
+    for (int tile = 0; tile < (k + TILE_SIZE - 1) / TILE_SIZE; ++tile) {
         // if row and tile * TILE_SIZE + tx are within A, set A, else set nothing
         if (row < m && tile * TILE_SIZE + tx < k) {
             sharedA[ty][tx] = a[row * k + tile * TILE_SIZE + tx];
@@ -115,15 +114,15 @@ __global__ void matmul_tile(float *a, float *b, float *c, int m, int k, int n) {
         // wait other threads to finish
         __syncthreads();
 
-        for (int l = 0; l < TILE_SIZE; l++) {
-            sum += sharedA[ty][k] * sharedB[k][tx];
+        for (int l = 0; l < TILE_SIZE; ++l) {
+            sum += sharedA[ty][l] * sharedB[l][tx];
         }
 
         __syncthreads();
     }
 
-    if (row < M && col < N) {
-        c[row * N + col] = sum;
+    if (row < m && col < n) {
+        c[row * n + col] = sum;
     }
 }
 
